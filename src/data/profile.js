@@ -1,5 +1,5 @@
 // src/data/profile.js
-import myphoto from "../assets/images/IMG_7306.jpg";
+import myphoto from "../assets/images/sample.jpg";
 
 export const COLOR_PALETTES = [
   {
