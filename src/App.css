@@ -358,7 +358,6 @@ button { font-family: var(--font-body); cursor: pointer; transition: all var(--t
 .ecard-lg     { width: 420px; }
 .ecard-tall   { width: 260px; }
 .ecard-noImage { width: 280px; }
-.ecard-custom { /* width set inline */ }
 
 /* Inner content wrapper — has padding, photo is edge-to-edge */
 .ecard-inner {

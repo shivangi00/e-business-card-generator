@@ -5,6 +5,8 @@ import Contact from "./eCard/Contact.jsx";
 import ProfileInfo from "./eCard/ProfileInfo.jsx";
 import { CARD_SIZES } from "./data/cardSizes";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { generateCardId, saveCard, updateCard, loadCard, getCardUrl } from "./utils/cardHelpers";
+import { resizeAndConvertImage } from "./utils/imageHelpers";
 
 /* ─────────────────────────────────────────────────────────────
    CONSTANTS
@@ -204,6 +206,12 @@ function BuilderApp() {
   const [showFocalPicker, setShowFocalPicker]       = useState(false);
   const [showIconPicker, setShowIconPicker]         = useState(false);
   const [downloading, setDownloading]               = useState(false);
+  
+  // NEW: Publishing state
+  const [publishing, setPublishing]                 = useState(false);
+  const [publishedUrl, setPublishedUrl]             = useState("");
+  const [myCardId, setMyCardId]                     = useState(null);
+  const [imageUploading, setImageUploading]         = useState(false);
 
   const focal    = profile.focalPoint || { x: 50, y: 30 };
   const sizeKey  = profile.cardSize   || "md";
@@ -218,6 +226,22 @@ function BuilderApp() {
 
   const selectedPalette =
     COLOR_PALETTES.find((p) => p.id === profile.paletteId) || COLOR_PALETTES[0];
+
+  // NEW: Load existing card on mount
+  useEffect(() => {
+    const loadExistingCard = async () => {
+      const storedCardId = localStorage.getItem("myCardId");
+      if (storedCardId) {
+        setMyCardId(storedCardId);
+        const result = await loadCard(storedCardId);
+        if (result.success) {
+          setProfile(result.data.profile);
+          setPublishedUrl(getCardUrl(storedCardId));
+        }
+      }
+    };
+    loadExistingCard();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("ecard-profile", JSON.stringify(profile));
@@ -234,17 +258,37 @@ function BuilderApp() {
     setProfile((prev) => ({ ...prev, socials: [...prev.socials, newSocial] }));
   };
 
-  const handlePhotoUpload = (e) => {
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setProfile((prev) => ({ ...prev, photo: URL.createObjectURL(file), focalPoint: { x: 50, y: 30 } }));
-    setTimeout(() => setShowFocalPicker(true), 100);
+    
+    setImageUploading(true);
+    
+    try {
+      // Convert image to base64 (resized to max 800x800 to reduce size)
+      const base64Image = await resizeAndConvertImage(file, 800, 800);
+      
+      // Update profile with base64 image
+      setProfile((prev) => ({ 
+        ...prev, 
+        photo: base64Image, 
+        focalPoint: { x: 50, y: 30 } 
+      }));
+      
+      // Show focal point picker after a short delay
+      setTimeout(() => setShowFocalPicker(true), 100);
+    } catch (error) {
+      console.error("Error processing image:", error);
+      alert("Failed to process image. Please try again with a different image.");
+    } finally {
+      setImageUploading(false);
+    }
   };
 
   // ── Status ──────────────────────────────────────────────────
-  const isCustomStatus = profile.status?.type === "custom";
   const statusLabel    = profile.status?.label || "Available for work";
   const matchedPreset  = STATUS_PRESETS.find((p) => p.label === statusLabel);
+  const isCustomStatus = !matchedPreset;
 
   const setStatusPreset = (preset) =>
     setProfile((prev) => ({ ...prev, status: { label: preset.label, type: preset.type } }));
@@ -252,10 +296,53 @@ function BuilderApp() {
   const setStatusCustom = (text) =>
     setProfile((prev) => ({ ...prev, status: { label: text, type: "custom" } }));
 
+  // NEW: Publish/Update card handler
+  const handlePublish = async () => {
+    setPublishing(true);
+    
+    try {
+      let cardId = myCardId;
+      let result;
+      
+      if (cardId) {
+        // Update existing card
+        result = await updateCard(cardId, profile);
+      } else {
+        // Create new card
+        cardId = generateCardId();
+        result = await saveCard(cardId, profile);
+        
+        if (result.success) {
+          setMyCardId(cardId);
+          localStorage.setItem("myCardId", cardId);
+        }
+      }
+      
+      if (result.success) {
+        const url = getCardUrl(cardId);
+        setPublishedUrl(url);
+        
+        // Show success message
+        alert(
+          myCardId 
+            ? "✅ Card updated successfully!" 
+            : "🎉 Card published successfully!\n\nShare your card with the link below."
+        );
+      } else {
+        throw new Error(result.error || "Failed to save card");
+      }
+    } catch (error) {
+      console.error("Publish error:", error);
+      alert("❌ Failed to publish card. Please try again.\n\nError: " + error.message);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   // ── Embed code ───────────────────────────────────────────────
   const cardUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/card`
-    : "https://your-deployed-url.com/card";
+    ? (myCardId ? getCardUrl(myCardId, true) : `${window.location.origin}/card?embed=true`)
+    : "https://your-deployed-url.com/card?embed=true";
 
   const getEmbedCode = () => {
     const w = size.width, h = size.height;
@@ -323,7 +410,7 @@ function BuilderApp() {
                 <div className="status-option-row">
                   {STATUS_PRESETS.map((preset) => (
                     <button key={preset.label} type="button"
-                      className={`status-option-btn ${statusLabel === preset.label && !isCustomStatus ? "active" : ""}`}
+                      className={`status-option-btn ${statusLabel === preset.label ? "active" : ""}`}
                       onClick={() => setStatusPreset(preset)}>
                       <span className="status-option-dot" />
                       {preset.label}
@@ -331,50 +418,43 @@ function BuilderApp() {
                   ))}
                   <button type="button"
                     className={`status-option-btn ${isCustomStatus ? "active" : ""}`}
-                    onClick={() => setStatusCustom("")}>
+                    onClick={() => setStatusCustom(isCustomStatus ? statusLabel : "")}>
                     <i className="fa-solid fa-pen" style={{ fontSize:"0.62rem" }} />
                     Custom
                   </button>
                 </div>
                 {isCustomStatus && (
-                  <div style={{ marginTop: 6, position: "relative" }}>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Freelancing, On sabbatical…"
-                      value={statusLabel === "Available for work" ? "" : statusLabel}
-                      onChange={(e) => {
-                        const text = e.target.value;
-                        // Limit to 28 characters
-                        if (text.length <= 28) {
-                          setStatusCustom(text);
-                        }
-                      }}
-                      maxLength={28}
-                      autoFocus
-                    />
-                    <span style={{
-                      position: "absolute",
-                      right: 10,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      fontSize: "0.7rem",
-                      color: (statusLabel === "Available for work" ? 0 : statusLabel.length) >= 28 ? "#ef4444" : "var(--text-3)",
-                      fontWeight: (statusLabel === "Available for work" ? 0 : statusLabel.length) >= 28 ? 600 : 400,
-                    }}>
-                      {statusLabel === "Available for work" ? "0" : statusLabel.length}/28
-                    </span>
-                  </div>
+                  <input type="text" style={{ marginTop: 6 }}
+                    placeholder="e.g. Freelancing, On sabbatical…"
+                    value={statusLabel}
+                    onChange={(e) => setStatusCustom(e.target.value)}
+                    autoFocus
+                  />
                 )}
               </div>
 
               {/* ── Photo ── */}
               <div className="photo-upload-row">
-                <label className="upload-label">
-                  <i className="fa-solid fa-image" />
-                  {profile.photo ? "Change photo" : "Upload photo"}
-                  <input type="file" accept="image/*" onChange={handlePhotoUpload} />
+                <label className={`upload-label ${imageUploading ? "disabled" : ""}`}>
+                  {imageUploading ? (
+                    <>
+                      <i className="fa-solid fa-spinner fa-spin" />
+                      Processing image...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-image" />
+                      {profile.photo ? "Change photo" : "Upload photo"}
+                    </>
+                  )}
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handlePhotoUpload}
+                    disabled={imageUploading}
+                  />
                 </label>
-                {profile.photo && (
+                {profile.photo && !imageUploading && (
                   <button type="button" className="btn-ghost focal-trigger-btn"
                     onClick={() => setShowFocalPicker(true)}>
                     <i className="fa-solid fa-crosshairs" /> Set focus
@@ -503,37 +583,179 @@ function BuilderApp() {
               )}
             </div>
 
+            {/* PUBLISH & SHARE */}
+            <div className="form-section">
+              <h3>Publish &amp; Share</h3>
+              
+              <p style={{ 
+                fontSize: "0.875rem", 
+                color: "var(--text-2)", 
+                marginBottom: "1rem",
+                lineHeight: 1.5
+              }}>
+                {myCardId 
+                  ? "Your card is published! Update it anytime or share your unique link." 
+                  : "Publish your card to get a unique shareable link that works everywhere."}
+              </p>
+
+              {/* Publish/Update Button */}
+              <button 
+                className="btn-primary" 
+                onClick={handlePublish}
+                disabled={publishing}
+                style={{ 
+                  width: "100%", 
+                  padding: "0.875rem",
+                  marginBottom: "1rem",
+                  fontSize: "1rem",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.5rem"
+                }}
+              >
+                {publishing ? (
+                  <>
+                    <i className="fa-solid fa-spinner fa-spin" />
+                    {myCardId ? "Updating..." : "Publishing..."}
+                  </>
+                ) : (
+                  <>
+                    <i className={myCardId ? "fa-solid fa-arrows-rotate" : "fa-solid fa-rocket"} />
+                    {myCardId ? "Update Card" : "Publish Card"}
+                  </>
+                )}
+              </button>
+              
+              {/* Published URL Display */}
+              {publishedUrl && (
+                <div style={{
+                  padding: "1rem",
+                  background: "#f0fdf4",
+                  border: "1px solid #86efac",
+                  borderRadius: "8px",
+                  marginBottom: "1rem"
+                }}>
+                  <div style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "0.5rem",
+                    marginBottom: "0.5rem"
+                  }}>
+                    <i className="fa-solid fa-circle-check" style={{ color: "#22c55e" }} />
+                    <p style={{ 
+                      margin: 0, 
+                      fontWeight: 600, 
+                      color: "#166534",
+                      fontSize: "0.875rem"
+                    }}>
+                      {myCardId ? "Card Updated!" : "Card Published!"}
+                    </p>
+                  </div>
+                  <div style={{
+                    display: "flex",
+                    gap: "0.5rem",
+                    alignItems: "center"
+                  }}>
+                    <input 
+                      type="text"
+                      readOnly
+                      value={publishedUrl}
+                      style={{
+                        flex: 1,
+                        padding: "0.5rem",
+                        fontSize: "0.8rem",
+                        border: "1px solid #86efac",
+                        borderRadius: "4px",
+                        background: "white",
+                        color: "#166534",
+                        fontFamily: "monospace"
+                      }}
+                      onClick={(e) => e.target.select()}
+                    />
+                    <button
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(publishedUrl);
+                          alert("✅ Link copied!");
+                        } catch (err) {
+                          alert("Please copy the link manually");
+                        }
+                      }}
+                      style={{
+                        padding: "0.5rem 0.75rem",
+                        background: "#22c55e",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "0.875rem",
+                        fontWeight: 600
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* EMBED & EXPORT */}
             <div className="form-section">
               <h3>Embed &amp; Export</h3>
-              <div className="embed-block">
-                <div className="embed-tabs">
-                  {EMBED_FORMATS.map((fmt) => (
-                    <button key={fmt}
-                      className={`embed-tab ${embedFormat === fmt ? "active" : ""}`}
-                      onClick={() => setEmbedFormat(fmt)}>{fmt}
+              
+              {!myCardId ? (
+                <div style={{
+                  padding: "1.5rem",
+                  background: "#fef3c7",
+                  border: "1px solid #fbbf24",
+                  borderRadius: "8px",
+                  textAlign: "center"
+                }}>
+                  <i className="fa-solid fa-circle-info" style={{ 
+                    fontSize: "1.5rem", 
+                    color: "#d97706",
+                    marginBottom: "0.5rem"
+                  }} />
+                  <p style={{ 
+                    margin: 0, 
+                    color: "#78350f",
+                    fontWeight: 600
+                  }}>
+                    Publish your card first to get the embed code
+                  </p>
+                </div>
+              ) : (
+                <div className="embed-block">
+                  <div className="embed-tabs">
+                    {EMBED_FORMATS.map((fmt) => (
+                      <button key={fmt}
+                        className={`embed-tab ${embedFormat === fmt ? "active" : ""}`}
+                        onClick={() => setEmbedFormat(fmt)}>{fmt}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea readOnly className="embed-textarea" value={getEmbedCode()} />
+                  <div className="embed-actions">
+                    <button className="btn-primary" onClick={() => handleCopy(getEmbedCode())}>
+                      {copied ? "✓ Copied!" : "Copy embed code"}
                     </button>
-                  ))}
-                </div>
-                <textarea readOnly className="embed-textarea" value={getEmbedCode()} />
-                <div className="embed-actions">
-                  <button className="btn-primary" onClick={() => handleCopy(getEmbedCode())}>
-                    {copied ? "✓ Copied!" : "Copy embed code"}
-                  </button>
-                  <button className="btn-ghost btn-export-png"
-                    onClick={handleDownloadPng} disabled={downloading}
-                    title="Download card as PNG image">
-                    <i className="fa-solid fa-download" />
-                    {downloading ? "Exporting…" : "Export PNG"}
-                  </button>
-                </div>
+                    <button className="btn-ghost btn-export-png"
+                      onClick={handleDownloadPng} disabled={downloading}
+                      title="Download card as PNG image">
+                      <i className="fa-solid fa-download" />
+                      {downloading ? "Exporting…" : "Export PNG"}
+                    </button>
+                  </div>
 
-                {/* PNG note */}
-                <p className="export-note">
-                  <i className="fa-solid fa-circle-info" />
-                  {" "}PNG export captures the live preview at 2× resolution — great for sharing on LinkedIn, email signatures, or slide decks.
-                </p>
-              </div>
+                  {/* PNG note */}
+                  <p className="export-note">
+                    <i className="fa-solid fa-circle-info" />
+                    {" "}PNG export captures the live preview at 2× resolution — great for sharing on LinkedIn, email signatures, or slide decks.
+                  </p>
+                </div>
+              )}
             </div>
 
           </div>
@@ -577,17 +799,8 @@ function BuilderApp() {
 
               {/* Inner content: text info + pinned socials */}
               <div style={{
-                flex: 1, 
-                display: "flex", 
-                flexDirection: "column",
-                // Better padding when no image - more breathing room
-                padding: profile.showImage && profile.photo 
-                  ? "14px 16px 14px" 
-                  : "24px 20px 20px",
-                // Center content vertically when no image
-                justifyContent: profile.showImage && profile.photo 
-                  ? "flex-start" 
-                  : "center",
+                flex: 1, display: "flex", flexDirection: "column",
+                padding: "14px 16px 14px",
               }}>
                 <ProfileInfo profile={profile} size={size} />
                 <Contact

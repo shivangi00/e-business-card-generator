@@ -6,9 +6,13 @@ import CardView from "./eCard/CardView.jsx";
 function App() {
   return (
     <Routes>
-      {/* Builder page at / */}
+      {/* Builder page at root */}
       <Route path="/" element={<BuilderApp />} />
-      {/* Card-only page at /card */}
+      
+      {/* Dynamic card view page with unique ID */}
+      <Route path="/card/:cardId" element={<CardView />} />
+      
+      {/* Legacy route for backward compatibility (uses localStorage) */}
       <Route path="/card" element={<CardView />} />
     </Routes>
   );
