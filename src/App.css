@@ -67,6 +67,10 @@ body {
   padding: 28px 28px 20px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 .logo-mark { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
 .logo-mark span { font-family: var(--font-display); font-size: 1.1rem; color: var(--accent); }
@@ -602,4 +606,41 @@ button { font-family: var(--font-body); cursor: pointer; transition: all var(--t
 /* Ensure proper stacking context */
 .social-icon-wrapper {
   isolation: isolate;
+}
+
+/* ══════════════════════════════════════════════════════════
+   CARD FLIP ANIMATION FOR QR CODE
+══════════════════════════════════════════════════════════ */
+
+@keyframes flipIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Card back styling */
+.card-back {
+  transition: opacity 0.3s ease-out;
+}
+
+.card-back:hover {
+  opacity: 0.95;
+}
+
+/* Ensure proper stacking for flip */
+.ecard {
+  position: relative;
+  overflow: visible; /* Allow QR code shadow to show */
+}
+
+/* Print: Hide QR code back */
+@media print {
+  .card-back {
+    display: none !important;
+  }
 }

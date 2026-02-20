@@ -40,18 +40,20 @@ function ProfileInfo({ profile, size }) {
           display: "flex",
           alignItems: "center",
           gap: "0.5rem",
-          marginTop: "-0.25rem", // Slight negative margin to keep it close to title
+          
         }}>
           {profile.companyLogo && (
             <img 
               src={profile.companyLogo} 
               alt={`${profile.company} logo`}
               style={{
-                width: "1.2rem",
-                height: "1.2rem",
-                objectFit: "contain",
-                borderRadius: "2px",
+                width: "1.1rem",
+                height: "1.1rem",
+                objectFit: "cover", // Changed from contain to cover
+                borderRadius: "50%", // CIRCULAR!
                 flexShrink: 0,
+                border: "1px solid rgba(128,128,128,0.2)",
+                background: "#fff",
               }}
             />
           )}
@@ -91,21 +93,6 @@ function ProfileInfo({ profile, size }) {
           {statusLabel}
         </span>
       </div>
-
-      {/* ── Location ── */}
-      <p style={{
-        fontSize: bodyFont,
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        margin: 0,
-        color: "inherit",
-        opacity: 0.5,
-      }}>
-        <i className="fa-sharp fa-solid fa-location-dot"
-           style={{ fontSize: "0.75em" }} />
-        {profile.location}
-      </p>
 
       {/* ── Email ── */}
       {profile.email && (
@@ -163,6 +150,21 @@ function ProfileInfo({ profile, size }) {
           {profile.phone}
         </a>
       )}
+
+      {/* ── Location ── */}
+      <p style={{
+        fontSize: bodyFont,
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        margin: "0 0 0.75rem 0",
+        color: "inherit",
+        opacity: 0.5,
+      }}>
+        <i className="fa-sharp fa-solid fa-location-dot"
+           style={{ fontSize: "0.75em" }} />
+        {profile.location}
+      </p>
     </div>
   );
 }

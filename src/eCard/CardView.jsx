@@ -1,4 +1,4 @@
-// src/eCard/CardView.jsx
+// src/eCard/CardView.jsx - PROPERLY FIXED: Full card flip
 import ProfileInfo from "./ProfileInfo.jsx";
 import Contact from "./Contact.jsx";
 import Header from "../components/Header.jsx";
@@ -10,20 +10,18 @@ import { useParams } from "react-router-dom";
 import { loadCard, copyToClipboard, getCardUrl } from "../utils/cardHelpers";
 
 function CardView() {
-  const { cardId } = useParams(); // Get cardId from URL (/card/:cardId)
+  const { cardId } = useParams();
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isFlipped, setIsFlipped] = useState(false); // Card flip state
 
-  // Detect if page is embedded (via ?embed=true parameter)
   const urlParams = new URLSearchParams(window.location.search);
   const isEmbedded = urlParams.get("embed") === "true";
 
-  // Load card data on mount
   useEffect(() => {
     const fetchCard = async () => {
       if (!cardId) {
-        // No cardId in URL - fallback to localStorage (legacy support)
         const stored = localStorage.getItem("ecard-profile");
         if (stored) {
           try {
@@ -36,7 +34,6 @@ function CardView() {
         return;
       }
 
-      // Load from Firebase
       try {
         const result = await loadCard(cardId);
         if (result.success) {
@@ -56,14 +53,12 @@ function CardView() {
     fetchCard();
   }, [cardId]);
 
-  // Derive card size and color palette from profile
   const sizeKey = profile.cardSize || "md";
   const size = CARD_SIZES[sizeKey] || CARD_SIZES.md;
   const selectedPalette =
     COLOR_PALETTES.find((p) => p.id === profile.paletteId) ||
     COLOR_PALETTES[0];
 
-  // Handle share button click
   const handleShare = async () => {
     if (!cardId) {
       alert("Please publish your card first to share it!");
@@ -72,7 +67,6 @@ function CardView() {
 
     const shareUrl = getCardUrl(cardId);
     
-    // Try native Web Share API first (mobile-friendly)
     if (navigator.share) {
       try {
         await navigator.share({
@@ -82,14 +76,12 @@ function CardView() {
         });
         return;
       } catch (err) {
-        // User cancelled or share failed, fall through to clipboard
         if (err.name !== "AbortError") {
           console.error("Share failed:", err);
         }
       }
     }
 
-    // Fallback to clipboard
     const success = await copyToClipboard(shareUrl);
     if (success) {
       alert("Card link copied to clipboard! 📋");
@@ -98,7 +90,21 @@ function CardView() {
     }
   };
 
-  // Loading state
+  const handleFlipChange = (flipped) => {
+    setIsFlipped(flipped);
+  };
+
+  const handleFlipBack = () => {
+    setIsFlipped(false);
+  };
+
+  const fullCardUrl = cardId ? getCardUrl(cardId) : window.location.href;
+
+  const getQRCodeUrl = () => {
+    if (!fullCardUrl) return "";
+    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(fullCardUrl)}`;
+  };
+
   if (loading) {
     return (
       <div style={{ 
@@ -111,19 +117,13 @@ function CardView() {
         background: "#f9fafb"
       }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ 
-            marginBottom: "1rem",
-            fontSize: "2rem"
-          }}>
-            ⏳
-          </div>
+          <div style={{ marginBottom: "1rem", fontSize: "2rem" }}>⏳</div>
           Loading card...
         </div>
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div style={{ 
@@ -170,7 +170,6 @@ function CardView() {
     );
   }
 
-  // Main render
   return (
     <div style={{ 
       minHeight: "100vh",
@@ -179,10 +178,8 @@ function CardView() {
       background: "#f9fafb"
     }}>
       
-      {/* Header - only show if NOT embedded */}
       {!isEmbedded && <Header />}
 
-      {/* Card Container */}
       <div style={{
         flex: 1,
         display: "flex",
@@ -206,49 +203,187 @@ function CardView() {
             overflow: "hidden",
             background: selectedPalette.background,
             color: selectedPalette.text,
+            position: "relative",
           }}
         >
-          {/* Profile Photo */}
-          {profile.showImage && size.photoHeight > 0 && profile.photo && (
-            <div style={{
-              height: size.photoHeight,
-              width: "100%",
-              overflow: "hidden",
-              flexShrink: 0,
-            }}>
-              <img
-                src={profile.photo}
-                alt={profile.name}
-                style={{
+          {/* FRONT SIDE - Only render when NOT flipped */}
+          {!isFlipped && (
+            <>
+              {/* Photo */}
+              {profile.showImage && size.photoHeight > 0 && profile.photo && (
+                <div style={{
+                  height: size.photoHeight,
                   width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  objectPosition: `${(profile.focalPoint || {x:50,y:30}).x}% ${(profile.focalPoint || {x:50,y:30}).y}%`,
-                  display: "block",
-                }}
-              />
-            </div>
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  borderRadius: "12px 12px 0 0",
+                }}>
+                  <img
+                    src={profile.photo}
+                    alt={profile.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      objectPosition: `${(profile.focalPoint || {x:50,y:30}).x}% ${(profile.focalPoint || {x:50,y:30}).y}%`,
+                      display: "block",
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Content */}
+              <div style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                padding: profile.showImage && profile.photo 
+                  ? "14px 16px 14px" 
+                  : "24px 20px 20px",
+                justifyContent: profile.showImage && profile.photo 
+                  ? "flex-start" 
+                  : "center",
+              }}>
+                <ProfileInfo profile={profile} size={size} />
+                <Contact 
+                  profile={profile} 
+                  onShare={handleShare}
+                  cardUrl={fullCardUrl}
+                  onFlipChange={handleFlipChange}
+                />
+              </div>
+            </>
           )}
 
-          {/* Card Content */}
-          <div style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            padding: profile.showImage && profile.photo 
-              ? "14px 16px 14px" 
-              : "24px 20px 20px",
-            justifyContent: profile.showImage && profile.photo 
-              ? "flex-start" 
-              : "center",
-          }}>
-            <ProfileInfo profile={profile} size={size} />
-            <Contact profile={profile} onShare={handleShare} />
-          </div>
+          {/* BACK SIDE - QR Code - Only render when flipped */}
+          {isFlipped && (
+            <div 
+              onClick={handleFlipBack}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "2rem 1.5rem",
+                cursor: "pointer",
+                animation: "flipIn 0.5s ease-out",
+                background: selectedPalette.background,
+                color: selectedPalette.text,
+                zIndex: 100,
+                borderRadius: "12px",
+              }}
+              className="card-back"
+            >
+              {/* Name at top */}
+              <div style={{
+                position: "absolute",
+                top: "1.5rem",
+                left: 0,
+                right: 0,
+                textAlign: "center",
+              }}>
+                <h3 style={{
+                  fontSize: "1.25rem",
+                  fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontWeight: 400,
+                  margin: 0,
+                  color: "inherit",
+                }}>
+                  {profile.name}
+                </h3>
+              </div>
+
+              {/* QR Code in center */}
+              <div style={{
+                background: "white",
+                padding: "1rem",
+                borderRadius: "12px",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0.75rem",
+              }}>
+                {fullCardUrl ? (
+                  <>
+                    <img 
+                      src={getQRCodeUrl()} 
+                      alt="QR Code"
+                      style={{
+                        width: "180px",
+                        height: "180px",
+                        display: "block",
+                      }}
+                    />
+                    <p style={{
+                      fontSize: "0.7rem",
+                      color: "#6b7280",
+                      margin: 0,
+                      textAlign: "center",
+                    }}>
+                      Scan to view card
+                    </p>
+                  </>
+                ) : (
+                  <div style={{
+                    width: "180px",
+                    height: "180px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#f3f4f6",
+                    borderRadius: "8px",
+                    color: "#6b7280",
+                    fontSize: "0.85rem",
+                    textAlign: "center",
+                    padding: "1rem",
+                  }}>
+                    Publish card to generate QR code
+                  </div>
+                )}
+              </div>
+
+              {/* Line at bottom */}
+              <div style={{
+                position: "absolute",
+                bottom: "1.5rem",
+                left: "2rem",
+                right: "2rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+              }}>
+                <div style={{
+                  flex: 1,
+                  height: "1px",
+                  background: "currentColor",
+                  opacity: 0.2,
+                }} />
+                <span style={{
+                  fontSize: "0.7rem",
+                  opacity: 0.4,
+                  whiteSpace: "nowrap",
+                }}>
+                  Tap to return
+                </span>
+                <div style={{
+                  flex: 1,
+                  height: "1px",
+                  background: "currentColor",
+                  opacity: 0.2,
+                }} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Footer - only show if NOT embedded */}
       {!isEmbedded && <Footer />}
     </div>
   );

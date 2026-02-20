@@ -1,4 +1,4 @@
-// src/BuilderApp.jsx - FIXED: Sub-icon duplication + Company Logo
+// src/BuilderApp.jsx - AUTO-FETCH LOGO + ALL FIXES
 import { PROFILE as DEFAULT_PROFILE, COLOR_PALETTES } from "./data/profile.js";
 import "./App.css";
 import Contact from "./eCard/Contact.jsx";
@@ -80,6 +80,31 @@ const ICON_CATALOGUE = [
   },
 ];
 
+// Helper: Fetch company logo from Clearbit
+async function fetchCompanyLogo(companyName) {
+  if (!companyName || companyName.trim().length === 0) return null;
+  
+  try {
+    // Convert company name to domain guess
+    const domain = companyName.toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[^\w]/g, '') + '.com';
+    
+    // Clearbit Logo API (free tier)
+    const logoUrl = `https://logo.clearbit.com/${domain}`;
+    
+    // Test if image exists
+    const response = await fetch(logoUrl, { method: 'HEAD' });
+    if (response.ok) {
+      return logoUrl;
+    }
+    return null;
+  } catch (err) {
+    console.error('Logo fetch error:', err);
+    return null;
+  }
+}
+
 function FocalPointPicker({ src, focal, onChange, onClose }) {
   const imgRef = useRef(null);
   const handleClick = useCallback(
@@ -123,7 +148,6 @@ function FocalPointPicker({ src, focal, onChange, onClose }) {
   );
 }
 
-// FIXED: Separate modal for nested icons to prevent confusion
 function IconPickerModal({ onAdd, onClose, isNested = false }) {
   const [url, setUrl] = useState("");
   const [selected, setSelected] = useState(null);
@@ -131,16 +155,13 @@ function IconPickerModal({ onAdd, onClose, isNested = false }) {
   const handleAdd = () => {
     if (!selected) return;
     
-    // Return different structure based on context
     if (isNested) {
-      // For nested icons, return simple structure
       onAdd({
         label: selected.label,
         fa: selected.fa,
         url: url || "#"
       });
     } else {
-      // For main socials, return full structure
       const isEmail = selected.label === "Email";
       onAdd({
         id: selected.label.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now(),
@@ -241,10 +262,12 @@ function BuilderApp() {
   const [showNestedIconPicker, setShowNestedIconPicker] = useState(null);
   const [downloading, setDownloading] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState("");
   const [myCardId, setMyCardId] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [logoFetching, setLogoFetching] = useState(false);
 
   const focal = profile.focalPoint || { x: 50, y: 30 };
   const sizeKey = profile.cardSize || "md";
@@ -255,6 +278,30 @@ function BuilderApp() {
     : CARD_SIZES[sizeKey] || CARD_SIZES.md;
 
   const selectedPalette = COLOR_PALETTES.find((p) => p.id === profile.paletteId) || COLOR_PALETTES[0];
+
+  // Auto-fetch company logo when company name changes
+  useEffect(() => {
+    const fetchLogo = async () => {
+      if (!profile.company || profile.company.trim().length === 0) {
+        return;
+      }
+      
+      // Don't fetch if user already uploaded a custom logo
+      if (profile.companyLogo && profile.companyLogo.startsWith('data:image')) {
+        return;
+      }
+      
+      setLogoFetching(true);
+      const logoUrl = await fetchCompanyLogo(profile.company);
+      if (logoUrl) {
+        setProfile((prev) => ({ ...prev, companyLogo: logoUrl }));
+      }
+      setLogoFetching(false);
+    };
+
+    const debounceTimer = setTimeout(fetchLogo, 800);
+    return () => clearTimeout(debounceTimer);
+  }, [profile.company]);
 
   useEffect(() => {
     const loadExistingCard = async () => {
@@ -306,17 +353,12 @@ function BuilderApp() {
     setProfile((prev) => ({ ...prev, socials: [...prev.socials, newSocial] }));
   };
 
-  // FIXED: Proper nested icon handler
   const handleAddNestedIcon = (socialIndex, iconData) => {
     setProfile((prev) => {
       const socials = [...prev.socials];
-      
-      // Initialize nestedIcons if it doesn't exist
       if (!socials[socialIndex].nestedIcons) {
         socials[socialIndex].nestedIcons = [];
       }
-      
-      // Only add if less than 3
       if (socials[socialIndex].nestedIcons.length < 3) {
         socials[socialIndex].nestedIcons.push({
           id: iconData.label.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now(),
@@ -325,7 +367,6 @@ function BuilderApp() {
           href: iconData.url
         });
       }
-      
       return { ...prev, socials };
     });
   };
@@ -346,13 +387,11 @@ function BuilderApp() {
     }
   };
 
-  // NEW: Company logo upload
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setLogoUploading(true);
     try {
-      // Resize to smaller size for logos (max 200x200)
       const base64Logo = await resizeAndConvertImage(file, 200, 200);
       setProfile((prev) => ({ ...prev, companyLogo: base64Logo }));
     } catch (error) {
@@ -435,6 +474,19 @@ function BuilderApp() {
     setDownloading(false);
   };
 
+  const handleFlipChange = (flipped) => {
+    setIsFlipped(flipped);
+  };
+
+  const handleFlipBack = () => {
+    setIsFlipped(false);
+  };
+
+  const getQRCodeUrl = () => {
+    const url = publishedUrl || window.location.href;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+  };
+
   const atLimit = profile.socials.length >= MAX_SOCIALS;
 
   return (
@@ -476,7 +528,6 @@ function BuilderApp() {
 
             {isAuthenticated && (
               <>
-                {/* IDENTITY */}
                 <div className="form-section">
                   <h3>Identity</h3>
 
@@ -493,16 +544,24 @@ function BuilderApp() {
                     </div>
                   ))}
 
-                  {/* Company with Logo */}
+                  {/* Company with AUTO-FETCH */}
                   <div className="form-field">
-                    <label>Company / Institute</label>
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      Company / Institute
+                      {logoFetching && (
+                        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "0.7rem", color: "var(--accent)" }} />
+                      )}
+                    </label>
                     <input type="text" value={profile.company || ""}
-                      placeholder="Your Company"
+                      placeholder="e.g. Google, Microsoft, Apple..."
                       onChange={(e) => handleChange("company", e.target.value)}
                     />
+                    <p style={{ fontSize: "0.7rem", color: "var(--text-3)", marginTop: "0.25rem" }}>
+                      💡 Logo auto-fetches from web. Upload custom logo below if needed.
+                    </p>
                   </div>
 
-                  {/* Company Logo Upload */}
+                  {/* Manual Logo Upload Override */}
                   {profile.company && (
                     <div style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
                       <label className={`upload-label ${logoUploading ? "disabled" : ""}`}
@@ -515,7 +574,7 @@ function BuilderApp() {
                         ) : (
                           <>
                             <i className="fa-solid fa-building" />
-                            {profile.companyLogo ? "Change logo" : "Upload company logo (optional)"}
+                            {profile.companyLogo ? "Replace logo" : "Upload custom logo"}
                           </>
                         )}
                         <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={logoUploading} />
@@ -524,8 +583,9 @@ function BuilderApp() {
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", 
                           padding: "0.5rem", background: "var(--surface-2)", borderRadius: "6px" }}>
                           <img src={profile.companyLogo} alt="Company logo" 
-                            style={{ width: "24px", height: "24px", objectFit: "contain", borderRadius: "2px" }} />
-                          <span style={{ fontSize: "0.75rem", color: "var(--text-2)" }}>Logo preview</span>
+                            style={{ width: "24px", height: "24px", objectFit: "cover", borderRadius: "50%", 
+                              border: "1px solid var(--border)" }} />
+                          <span style={{ fontSize: "0.75rem", color: "var(--text-2)" }}>Logo preview (circular)</span>
                           <button type="button"
                             onClick={() => handleChange("companyLogo", "")}
                             style={{ marginLeft: "auto", padding: "0.25rem 0.5rem", background: "transparent",
@@ -645,7 +705,7 @@ function BuilderApp() {
                   </label>
                 </div>
 
-                {/* APPEARANCE - keeping existing code */}
+                {/* APPEARANCE */}
                 <div className="form-section">
                   <h3>Appearance</h3>
                   <div className="form-field">
@@ -692,7 +752,7 @@ function BuilderApp() {
                   </div>
                 </div>
 
-                {/* SOCIAL LINKS with NESTED ICONS - FIXED */}
+                {/* SOCIAL LINKS */}
                 <div className="form-section">
                   <div className="section-header-row">
                     <h3>Social links</h3>
@@ -737,7 +797,6 @@ function BuilderApp() {
                           </button>
                         </div>
                         
-                        {/* Nested Icons Toggle */}
                         <div style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "1px solid var(--border)",
                           display: "flex", alignItems: "center", gap: "0.5rem" }}>
                           <label style={{ fontSize: "0.75rem", color: "var(--text-2)",
@@ -765,7 +824,6 @@ function BuilderApp() {
                           </label>
                         </div>
 
-                        {/* Nested Icon Manager */}
                         {social.isNested && (
                           <div style={{ marginTop: "0.5rem", padding: "0.5rem",
                             background: "var(--surface-2)", borderRadius: "6px" }}>
@@ -830,7 +888,6 @@ function BuilderApp() {
                   )}
                 </div>
 
-                {/* Rest of the sections remain the same... */}
                 {/* PUBLISH & SHARE */}
                 <div className="form-section">
                   <h3>Publish &amp; Share</h3>
@@ -942,21 +999,185 @@ function BuilderApp() {
             <div className="preview-wrapper">
               <div className="preview-glow" />
               <div id="ecard-preview" className={`ecard ecard-${sizeKey}`}
-                style={{ width: `${size.width}px`, minHeight: `${size.height}px`,
-                  background: selectedPalette.background, color: selectedPalette.text,
-                  "--card-bg": selectedPalette.background, "--card-text": selectedPalette.text }}>
+                style={{ 
+                  width: `${size.width}px`, 
+                  minHeight: `${size.height}px`,
+                  background: selectedPalette.background, 
+                  color: selectedPalette.text,
+                  "--card-bg": selectedPalette.background, 
+                  "--card-text": selectedPalette.text,
+                  position: "relative",
+                  overflow: "hidden"
+                }}>
                 
-                {profile.showImage && size.photoHeight > 0 && (
-                  <div style={{ height: size.photoHeight, width: "100%", overflow: "hidden", flexShrink: 0,
-                    backgroundImage: `url(${profile.photo})`, backgroundSize: "cover",
-                    backgroundPosition: `${(profile.focalPoint || { x: 50, y: 30 }).x}% ${(profile.focalPoint || { x: 50, y: 30 }).y}%`,
-                    backgroundRepeat: "no-repeat" }} />
+                {/* FRONT SIDE - Only when NOT flipped */}
+                {!isFlipped && (
+                  <>
+                    {profile.showImage && size.photoHeight > 0 && (
+                      <div style={{
+                        height: size.photoHeight,
+                        width: "100%",
+                        overflow: "hidden",
+                        flexShrink: 0,
+                        borderRadius: "12px 12px 0 0",
+                        backgroundImage: `url(${profile.photo})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: `${(profile.focalPoint || { x: 50, y: 30 }).x}% ${(profile.focalPoint || { x: 50, y: 30 }).y}%`,
+                        backgroundRepeat: "no-repeat",
+                      }} />
+                    )}
+
+                    <div style={{ 
+                      flex: 1, 
+                      display: "flex", 
+                      flexDirection: "column", 
+                      padding: "14px 16px 14px" 
+                    }}>
+                      <ProfileInfo profile={profile} size={size} />
+                      <Contact 
+                        profile={profile} 
+                        onShare={() => handleCopy(window.location.href)}
+                        cardUrl={publishedUrl || window.location.href}
+                        onFlipChange={handleFlipChange}
+                      />
+                    </div>
+                  </>
                 )}
 
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "14px 16px 14px" }}>
-                  <ProfileInfo profile={profile} size={size} />
-                  <Contact profile={profile} onShare={() => handleCopy(window.location.href)} />
-                </div>
+                {/* BACK SIDE - QR Code - Only when flipped */}
+                {isFlipped && (
+                  <div 
+                    onClick={handleFlipBack}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "2rem 1.5rem",
+                      cursor: "pointer",
+                      animation: "flipIn 0.5s ease-out",
+                      background: selectedPalette.background,
+                      color: selectedPalette.text,
+                      zIndex: 100,
+                      borderRadius: "12px",
+                    }}
+                    className="card-back"
+                  >
+                    {/* Name at top */}
+                    <div style={{
+                      position: "absolute",
+                      top: "1.5rem",
+                      left: 0,
+                      right: 0,
+                      textAlign: "center",
+                    }}>
+                      <h3 style={{
+                        fontSize: "1.25rem",
+                        fontFamily: "'DM Serif Display', Georgia, serif",
+                        fontWeight: 400,
+                        margin: 0,
+                        color: "inherit",
+                      }}>
+                        {profile.name}
+                      </h3>
+                      <p style={{
+                        fontSize: "0.85rem",
+                        margin: "0.25rem 0 0 0",
+                        color: "inherit",
+                        opacity: 0.6,
+                      }}>
+                        {profile.title}
+                      </p>
+                    </div>
+
+                    {/* QR Code in center */}
+                    <div style={{
+                      background: "white",
+                      padding: "1rem",
+                      borderRadius: "5px",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                    }}>
+                      {publishedUrl ? (
+                        <>
+                          <img 
+                            src={getQRCodeUrl()} 
+                            alt="QR Code"
+                            style={{
+                              width: "100px",
+                              height: "100px",
+                              display: "block",
+                            }}
+                          />
+                          <p style={{
+                            fontSize: "0.7rem",
+                            color: "#6b7280",
+                            margin: 0,
+                            textAlign: "center",
+                          }}>
+                            Scan to view card
+                          </p>
+                        </>
+                      ) : (
+                        <div style={{
+                          width: "180px",
+                          height: "180px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "#f3f4f6",
+                          borderRadius: "8px",
+                          color: "#6b7280",
+                          fontSize: "0.85rem",
+                          textAlign: "center",
+                          padding: "1rem",
+                        }}>
+                          Publish card to generate QR code
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Line at bottom */}
+                    <div style={{
+                      position: "absolute",
+                      bottom: "1.5rem",
+                      left: "2rem",
+                      right: "2rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                    }}>
+                      <div style={{
+                        flex: 1,
+                        height: "1px",
+                        background: "currentColor",
+                        opacity: 0.2,
+                      }} />
+                      <span style={{
+                        fontSize: "0.7rem",
+                        opacity: 0.4,
+                        whiteSpace: "nowrap",
+                      }}>
+                        Tap to return
+                      </span>
+                      <div style={{
+                        flex: 1,
+                        height: "1px",
+                        background: "currentColor",
+                        opacity: 0.2,
+                      }} />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

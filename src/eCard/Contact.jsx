@@ -1,22 +1,27 @@
-// src/eCard/Contact.jsx - FIXED VERSION
+// src/eCard/Contact.jsx - PROPERLY FIXED: Flip at card level
 import { useState } from "react";
 
-function Contact({ profile, onShare }) {
+function Contact({ profile, onShare, cardUrl, onFlipChange }) {
   const [hoveredNested, setHoveredNested] = useState(null);
+
+  const handleShareClick = () => {
+    if (onFlipChange) {
+      onFlipChange(true); // Tell parent to flip
+    }
+  };
 
   return (
     <div style={{
       marginTop: "auto",
-      paddingTop: 10,
+      paddingTop: 16,
       borderTop: "1px solid rgba(128,128,128,0.18)",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-around",
       position: "relative",
-      minHeight: "50px", // Give space for fan animation
+      minHeight: "50px",
     }}>
       {profile.socials.slice(0, 4).map((social, index) => {
-        // Check if this social has nested icons
         const hasNested = social.isNested && social.nestedIcons && social.nestedIcons.length > 0;
         const isHovered = hoveredNested === social.id;
 
@@ -28,12 +33,12 @@ function Contact({ profile, onShare }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              padding: hasNested ? "30px 0 0 0" : "0",
             }}
             onMouseEnter={() => hasNested && setHoveredNested(social.id)}
             onMouseLeave={() => hasNested && setHoveredNested(null)}
             className="social-icon-wrapper"
           >
-            {/* Main Icon */}
             <a
               href={hasNested ? "#" : social.href}
               onClick={(e) => hasNested && e.preventDefault()}
@@ -70,7 +75,6 @@ function Contact({ profile, onShare }) {
             >
               <i className={social.iconClass} style={{ fontSize: "1rem" }} />
               
-              {/* Badge indicator for nested icons */}
               {hasNested && (
                 <span style={{
                   position: "absolute",
@@ -95,18 +99,18 @@ function Contact({ profile, onShare }) {
               )}
             </a>
 
-            {/* Fan Animation for Nested Icons */}
             {hasNested && isHovered && (
               <div
                 style={{
                   position: "absolute",
-                  bottom: "calc(100% + 8px)",
+                  bottom: "calc(100% - 30px)",
                   left: "50%",
                   transform: "translateX(-50%)",
                   display: "flex",
                   gap: 6,
                   zIndex: 100,
                   pointerEvents: "auto",
+                  paddingBottom: "30px",
                 }}
                 className="fan-container"
               >
@@ -126,12 +130,12 @@ function Contact({ profile, onShare }) {
                         height: 32,
                         borderRadius: 8,
                         color: "inherit",
-                        opacity: 0.9,
+                        opacity: 0.95,
                         textDecoration: "none",
                         background: "var(--card-bg, #fff)",
                         backdropFilter: "blur(8px)",
-                        border: "2px solid rgba(99,102,241,0.3)",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                        border: "2px solid rgba(99,102,241,0.4)",
+                        boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
                         transition: "all 0.2s",
                         animation: `fanOut 0.3s ease-out ${nestedIndex * 0.08}s both`,
                         transformOrigin: "bottom center",
@@ -140,13 +144,13 @@ function Contact({ profile, onShare }) {
                         e.currentTarget.style.opacity = "1";
                         e.currentTarget.style.borderColor = "#6366f1";
                         e.currentTarget.style.transform = "scale(1.15) translateY(-2px)";
-                        e.currentTarget.style.boxShadow = "0 8px 20px rgba(99,102,241,0.3)";
+                        e.currentTarget.style.boxShadow = "0 8px 24px rgba(99,102,241,0.4)";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = "0.9";
-                        e.currentTarget.style.borderColor = "rgba(99,102,241,0.3)";
+                        e.currentTarget.style.opacity = "0.95";
+                        e.currentTarget.style.borderColor = "rgba(99,102,241,0.4)";
                         e.currentTarget.style.transform = "scale(1) translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+                        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
                       }}
                       className="nested-icon"
                     >
@@ -157,11 +161,8 @@ function Contact({ profile, onShare }) {
               </div>
             )}
 
-            {/* Print-only: Show nested icons in mini grid */}
             {hasNested && (
-              <div className="print-nested-icons" style={{
-                display: "none", // Hidden on screen, shown in print
-              }}>
+              <div className="print-nested-icons" style={{ display: "none" }}>
                 {social.nestedIcons.map((nested) => (
                   <i key={nested.id} className={nested.iconClass} />
                 ))}
@@ -171,10 +172,10 @@ function Contact({ profile, onShare }) {
         );
       })}
 
-      {/* Share Icon */}
-      <a
-        onClick={onShare}
-        title="Share card"
+      {/* Share Icon - Triggers Flip */}
+      <button
+        onClick={handleShareClick}
+        title="Share card - Show QR code"
         style={{
           display: "flex",
           alignItems: "center",
@@ -185,20 +186,23 @@ function Contact({ profile, onShare }) {
           color: "inherit",
           opacity: 0.5,
           cursor: "pointer",
-          textDecoration: "none",
-          transition: "opacity 0.15s, background 0.15s",
+          border: "none",
+          background: "transparent",
+          transition: "opacity 0.15s, background 0.15s, transform 0.2s",
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.opacity = "1";
           e.currentTarget.style.background = "rgba(128,128,128,0.1)";
+          e.currentTarget.style.transform = "scale(1.1)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.opacity = "0.5";
           e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.transform = "scale(1)";
         }}
       >
-        <i className="fa-solid fa-share-nodes" style={{ fontSize: "1rem" }} />
-      </a>
+        <i className="fa-solid fa-share" style={{ fontSize: "1rem" }} />
+      </button>
     </div>
   );
 }
