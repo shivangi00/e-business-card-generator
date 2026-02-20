@@ -33,7 +33,7 @@ function Contact({ profile, onShare, cardUrl, onFlipChange }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: hasNested ? "30px 0 0 0" : "0",
+              padding:"0", // changed padding to 0 to retain position of the root social icons
             }}
             onMouseEnter={() => hasNested && setHoveredNested(social.id)}
             onMouseLeave={() => hasNested && setHoveredNested(null)}
@@ -103,8 +103,8 @@ function Contact({ profile, onShare, cardUrl, onFlipChange }) {
               <div
                 style={{
                   position: "absolute",
-                  bottom: "calc(100% - 30px)",
-                  left: "50%",
+                  bottom: "30%",
+                  left: "100%", // no more floating icons hiding away
                   transform: "translateX(-50%)",
                   display: "flex",
                   gap: 6,
