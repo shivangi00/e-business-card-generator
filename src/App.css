@@ -500,3 +500,106 @@ button { font-family: var(--font-body); cursor: pointer; transition: all var(--t
   .builder-panel { height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }
   .preview-pane { padding: 40px 20px; min-height: 60vh; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   FAN ANIMATION FOR NESTED SOCIAL ICONS
+══════════════════════════════════════════════════════════ */
+
+@keyframes fanOut {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.nested-badge {
+  pointer-events: none;
+}
+
+/* Hide nested icons badge in print */
+@media print {
+  .nested-badge {
+    display: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   PRINT STYLES - Mini Grid Layout for Nested Icons
+══════════════════════════════════════════════════════════ */
+
+@media print {
+  /* Hide interactive elements */
+  .fan-container {
+    display: none !important;
+  }
+
+  /* Show nested icons in compact grid for print */
+  .print-nested-icons {
+    display: flex !important;
+    gap: 2px;
+    position: absolute;
+    bottom: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    opacity: 0.7;
+  }
+
+  .print-nested-icons i {
+    width: 10px;
+    height: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Adjust social icon wrapper spacing for print */
+  .social-icon-wrapper {
+    margin-bottom: 14px;
+  }
+
+  /* Ensure card fits on printed page */
+  .ecard {
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  /* Hide share button in print */
+  .ecard a[title="Share card"] {
+    display: none !important;
+  }
+
+  /* Optimize spacing for print */
+  body {
+    background: white !important;
+  }
+
+  /* Hide headers/footers for clean print */
+  header, footer {
+    display: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   ACCESSIBILITY & INTERACTION IMPROVEMENTS
+══════════════════════════════════════════════════════════ */
+
+/* Smooth transitions for nested icons */
+.nested-icon {
+  will-change: transform, opacity, background;
+}
+
+/* Focus states for keyboard navigation */
+.social-icon-wrapper a:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Ensure proper stacking context */
+.social-icon-wrapper {
+  isolation: isolate;
+}

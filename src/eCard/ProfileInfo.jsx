@@ -1,7 +1,4 @@
-// src/eCard/ProfileInfo.jsx
-// Fixed: Custom icon for status, better vertical alignment
-// SEPARATE COMMIT: CV link on its own line
-
+// src/eCard/ProfileInfo.jsx - WITH COMPANY LOGO
 function ProfileInfo({ profile, size }) {
   const { nameFont, titleFont, bodyFont } = size;
   const statusLabel = profile.status?.label || "Available for work";
@@ -26,43 +23,50 @@ function ProfileInfo({ profile, size }) {
         {profile.name}
       </p>
 
-      {/* ── Title (without CV link) ── */}
+      {/* ── Title ── */}
       <p style={{
         fontSize: titleFont,
         margin: 0,
         color: "inherit",
         opacity: 0.6,
+        lineHeight: 1.3,
       }}>
         {profile.title}
       </p>
 
-      {/* ── CV/Resume link on separate line ── */}
-      {profile.cvUrl && (
-        <a 
-          href={profile.cvUrl} 
-          target="_blank" 
-          rel="noreferrer"
-          style={{ 
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: "0.8rem",
+      {/* ── Company with Logo ── */}
+      {profile.company && (
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          marginTop: "-0.25rem", // Slight negative margin to keep it close to title
+        }}>
+          {profile.companyLogo && (
+            <img 
+              src={profile.companyLogo} 
+              alt={`${profile.company} logo`}
+              style={{
+                width: "1.2rem",
+                height: "1.2rem",
+                objectFit: "contain",
+                borderRadius: "2px",
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <span style={{ 
+            fontSize: "0.85rem", 
             color: "inherit",
-            opacity: 0.6,
-            textDecoration: "none",
-            width: "max-content",
-            transition: "opacity 0.2s",
-          }}
-          onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
-          onMouseLeave={e => e.currentTarget.style.opacity = "0.6"}
-        >
-          <i className="fa-regular fa-file-lines" style={{ fontSize: "0.9em" }} />
-          <span>View Resume</span>
-          <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.7em" }} />
-        </a>
+            opacity: 0.5,
+            lineHeight: 1.2,
+          }}>
+            {profile.company}
+          </span>
+        </div>
       )}
 
-      {/* ── Status badge — with custom icon ── */}
+      {/* ── Status badge — customizable ── */}
       <div style={{
         display: "inline-flex",
         alignItems: "center",
@@ -102,6 +106,63 @@ function ProfileInfo({ profile, size }) {
            style={{ fontSize: "0.75em" }} />
         {profile.location}
       </p>
+
+      {/* ── Email ── */}
+      {profile.email && (
+        <a
+          href={`mailto:${profile.email}`}
+          style={{
+            fontSize: bodyFont,
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            margin: 0,
+            color: "inherit",
+            opacity: 0.5,
+            textDecoration: "none",
+            transition: "opacity 0.2s",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+        >
+          <i className="fa-sharp fa-solid fa-envelope"
+             style={{ fontSize: "0.75em" }} />
+          {profile.email}
+          {profile.emailType && (
+            <span style={{ 
+              fontSize: "0.7em", 
+              opacity: 0.6,
+              marginLeft: "-2px"
+            }}>
+              ({profile.emailType === "work" ? "Work" : "Personal"})
+            </span>
+          )}
+        </a>
+      )}
+
+      {/* ── Phone (optional) ── */}
+      {profile.phone && (
+        <a
+          href={`tel:${profile.phone}`}
+          style={{
+            fontSize: bodyFont,
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            margin: 0,
+            color: "inherit",
+            opacity: 0.5,
+            textDecoration: "none",
+            transition: "opacity 0.2s",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = "0.5"}
+        >
+          <i className="fa-sharp fa-solid fa-phone"
+             style={{ fontSize: "0.75em" }} />
+          {profile.phone}
+        </a>
+      )}
     </div>
   );
 }

@@ -57,7 +57,7 @@ function SignIn() {
           display: "flex",
           alignItems: "center",
           gap: "0.75rem",
-          padding: "0.875rem 2rem",
+          padding: "0.5rem",
           background: "white",
           color: "#333",
           border: "none",

@@ -16,168 +16,228 @@ function UserProfile() {
     setSigningOut(false);
   };
 
+  const initials =
+    user.displayName?.charAt(0)?.toUpperCase() ||
+    user.email?.charAt(0)?.toUpperCase() ||
+    "U";
+
   return (
     <div style={{ position: "relative" }}>
-      {/* User Avatar Button */}
+      {/* Trigger: avatar + chevron only */}
       <button
-        onClick={() => setShowMenu(!showMenu)}
+        type="button"
+        onClick={() => setShowMenu((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={showMenu}
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.5rem",
-          padding: "0.5rem 0.75rem",
-          background: "rgba(99, 102, 241, 0.1)",
-          border: "1px solid rgba(99, 102, 241, 0.2)",
-          borderRadius: "8px",
+          gap: "0.35rem",
+          padding: "0.3rem 0.45rem",
+          background: "rgba(15, 23, 42, 0.04)",
+          border: "1px solid rgba(148, 163, 184, 0.5)",
+          borderRadius: "999px",
           cursor: "pointer",
-          transition: "all 0.2s",
+          transition: "background 0.15s ease, border-color 0.15s ease",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(99, 102, 241, 0.15)";
-          e.currentTarget.style.borderColor = "rgba(99, 102, 241, 0.3)";
+          e.currentTarget.style.background = "rgba(15, 23, 42, 0.07)";
+          e.currentTarget.style.borderColor = "rgba(148, 163, 184, 0.9)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = "rgba(99, 102, 241, 0.1)";
-          e.currentTarget.style.borderColor = "rgba(99, 102, 241, 0.2)";
+          e.currentTarget.style.background = "rgba(15, 23, 42, 0.04)";
+          e.currentTarget.style.borderColor = "rgba(148, 163, 184, 0.5)";
         }}
       >
+        {/* Avatar */}
         {user.photoURL ? (
           <img
             src={user.photoURL}
             alt={user.displayName || "User"}
             style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              objectFit: "cover"
+              width: 28,
+              height: 28,
+              borderRadius: "999px",
+              objectFit: "cover",
+              flexShrink: 0,
             }}
           />
         ) : (
-          <div style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "50%",
-            background: "#6366f1",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 600,
-            fontSize: "0.875rem"
-          }}>
-            {user.displayName?.charAt(0) || user.email?.charAt(0) || "U"}
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "999px",
+              background: "linear-gradient(135deg, #4f46e5, #22c55e)",
+              color: "white",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 600,
+              fontSize: "0.8rem",
+              flexShrink: 0,
+            }}
+          >
+            {initials}
           </div>
         )}
-        
-        <span style={{ 
-          fontSize: "0.875rem", 
-          fontWeight: 500,
-          color: "#374151",
-          maxWidth: "150px",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap"
-        }}>
-          {user.displayName || user.email}
-        </span>
-        
-        <i 
-          className="fa-solid fa-chevron-down" 
-          style={{ 
-            fontSize: "0.75rem",
-            color: "#6b7280",
-            transition: "transform 0.2s",
-            transform: showMenu ? "rotate(180deg)" : "rotate(0)"
-          }} 
+
+        {/* Chevron */}
+        <i
+          className="fa-solid fa-chevron-down"
+          style={{
+            fontSize: "0.7rem",
+            color: "#9ca3af",
+            transition: "transform 0.15s ease",
+            transform: showMenu ? "rotate(180deg)" : "rotate(0deg)",
+          }}
         />
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown */}
       {showMenu && (
         <>
-          {/* Backdrop to close menu */}
+          {/* Backdrop */}
           <div
             onClick={() => setShowMenu(false)}
             style={{
               position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 998
+              inset: 0,
+              zIndex: 998,
             }}
           />
-          
-          {/* Menu */}
-          <div style={{
-            position: "absolute",
-            top: "calc(100% + 0.5rem)",
-            right: 0,
-            background: "white",
-            border: "1px solid #e5e7eb",
-            borderRadius: "8px",
-            boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-            minWidth: "220px",
-            zIndex: 999,
-            overflow: "hidden"
-          }}>
-            {/* User Info */}
-            <div style={{
-              padding: "1rem",
-              borderBottom: "1px solid #e5e7eb"
-            }}>
-              <p style={{
-                margin: 0,
-                fontSize: "0.875rem",
-                fontWeight: 600,
-                color: "#111827",
-                marginBottom: "0.25rem"
-              }}>
-                {user.displayName || "User"}
-              </p>
-              <p style={{
-                margin: 0,
-                fontSize: "0.75rem",
-                color: "#6b7280"
-              }}>
-                {user.email}
-              </p>
+
+          {/* Menu panel */}
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 0.5rem)",
+              right: 0,
+              background: "var(--card-bg, #0f172a)",
+              border: "1px solid rgba(148, 163, 184, 0.5)",
+              borderRadius: 10,
+              boxShadow: "0 18px 45px rgba(15, 23, 42, 0.45)",
+              minWidth: 230,
+              zIndex: 999,
+              overflow: "hidden",
+            }}
+          >
+            {/* Header with full user info */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                padding: "0.75rem 0.9rem",
+                borderBottom: "1px solid rgba(148, 163, 184, 0.35)",
+              }}
+            >
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName || "User"}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "999px",
+                    objectFit: "cover",
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "999px",
+                    background:
+                      "linear-gradient(135deg, #4f46e5, #22c55e)",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    flexShrink: 0,
+                  }}
+                >
+                  {initials}
+                </div>
+              )}
+
+              <div>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: "var(--card-text, #f9fafb)",
+                  }}
+                >
+                  {user.displayName || "User"}
+                </p>
+                <p
+                  style={{
+                    margin: 0,
+                    marginTop: 2,
+                    fontSize: "0.75rem",
+                    color: "rgba(148, 163, 184, 0.9)",
+                    maxWidth: 160,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={user.email}
+                >
+                  {user.email}
+                </p>
+              </div>
             </div>
 
-            {/* Menu Items */}
-            <div style={{ padding: "0.5rem" }}>
+            {/* Actions */}
+            <div style={{ padding: "0.4rem 0.4rem 0.5rem" }}>
               <button
                 onClick={handleSignOut}
                 disabled={signingOut}
                 style={{
                   width: "100%",
-                  padding: "0.625rem 0.75rem",
+                  padding: "0.45rem 0.6rem",
                   background: "transparent",
                   border: "none",
-                  borderRadius: "4px",
+                  borderRadius: 6,
                   textAlign: "left",
-                  cursor: signingOut ? "not-allowed" : "pointer",
+                  cursor: signingOut ? "default" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   gap: "0.5rem",
-                  fontSize: "0.875rem",
-                  color: "#dc2626",
+                  fontSize: "0.8rem",
+                  color: "#fecaca",
                   fontWeight: 500,
-                  transition: "background 0.2s",
-                  opacity: signingOut ? 0.5 : 1
+                  transition:
+                    "background 0.15s ease, color 0.15s ease",
+                  opacity: signingOut ? 0.7 : 1,
                 }}
-                onMouseEnter={(e) => !signingOut && (e.currentTarget.style.background = "#fef2f2")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                onMouseEnter={(e) => {
+                  if (!signingOut) {
+                    e.currentTarget.style.background =
+                      "rgba(248, 113, 113, 0.08)";
+                    e.currentTarget.style.color = "#fca5a5";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "#fecaca";
+                }}
               >
                 {signingOut ? (
                   <>
                     <i className="fa-solid fa-spinner fa-spin" />
-                    Signing out...
+                    Signing out…
                   </>
                 ) : (
                   <>
                     <i className="fa-solid fa-right-from-bracket" />
-                    Sign Out
+                    Sign out
                   </>
                 )}
               </button>
