@@ -1,4 +1,4 @@
-// src/BuilderApp.jsx - AUTO-FETCH LOGO + ALL FIXES
+// src/BuilderApp.jsx - MOBILE FIXED (Safari input attributes + layout)
 import { PROFILE as DEFAULT_PROFILE, COLOR_PALETTES } from "./data/profile.js";
 import "./App.css";
 import Contact from "./eCard/Contact.jsx";
@@ -83,21 +83,13 @@ const ICON_CATALOGUE = [
 // Helper: Fetch company logo from Clearbit
 async function fetchCompanyLogo(companyName) {
   if (!companyName || companyName.trim().length === 0) return null;
-  
   try {
-    // Convert company name to domain guess
     const domain = companyName.toLowerCase()
       .replace(/\s+/g, '')
       .replace(/[^\w]/g, '') + '.com';
-    
-    // Clearbit Logo API (free tier)
     const logoUrl = `https://logo.clearbit.com/${domain}`;
-    
-    // Test if image exists
     const response = await fetch(logoUrl, { method: 'HEAD' });
-    if (response.ok) {
-      return logoUrl;
-    }
+    if (response.ok) return logoUrl;
     return null;
   } catch (err) {
     console.error('Logo fetch error:', err);
@@ -154,13 +146,8 @@ function IconPickerModal({ onAdd, onClose, isNested = false }) {
 
   const handleAdd = () => {
     if (!selected) return;
-    
     if (isNested) {
-      onAdd({
-        label: selected.label,
-        fa: selected.fa,
-        url: url || "#"
-      });
+      onAdd({ label: selected.label, fa: selected.fa, url: url || "#" });
     } else {
       const isEmail = selected.label === "Email";
       onAdd({
@@ -212,9 +199,18 @@ function IconPickerModal({ onAdd, onClose, isNested = false }) {
           ) : (
             <i className="fa-solid fa-link" style={{ color: "var(--text-3)", fontSize: "1rem", flexShrink: 0 }} />
           )}
-          <input type="text" autoFocus
+          {/* FIX: correct inputMode + autoCorrect/Capitalize for URL field */}
+          <input
+            type={selected?.label === "Email" ? "email" : "url"}
+            inputMode={selected?.label === "Email" ? "email" : "url"}
+            autoCorrect="off"
+            autoCapitalize="none"
+            autoComplete={selected?.label === "Email" ? "email" : "url"}
+            spellCheck="false"
+            autoFocus
             placeholder={selected?.label === "Email" ? "email@example.com" : "https://..."}
-            value={url} onChange={(e) => setUrl(e.target.value)}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
           />
         </div>
@@ -268,6 +264,8 @@ function BuilderApp() {
   const [imageUploading, setImageUploading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoFetching, setLogoFetching] = useState(false);
+  // FIX: mobile preview toggle state
+  const [showMobilePreview, setShowMobilePreview] = useState(false);
 
   const focal = profile.focalPoint || { x: 50, y: 30 };
   const sizeKey = profile.cardSize || "md";
@@ -279,26 +277,15 @@ function BuilderApp() {
 
   const selectedPalette = COLOR_PALETTES.find((p) => p.id === profile.paletteId) || COLOR_PALETTES[0];
 
-  // Auto-fetch company logo when company name changes
   useEffect(() => {
     const fetchLogo = async () => {
-      if (!profile.company || profile.company.trim().length === 0) {
-        return;
-      }
-      
-      // Don't fetch if user already uploaded a custom logo
-      if (profile.companyLogo && profile.companyLogo.startsWith('data:image')) {
-        return;
-      }
-      
+      if (!profile.company || profile.company.trim().length === 0) return;
+      if (profile.companyLogo && profile.companyLogo.startsWith('data:image')) return;
       setLogoFetching(true);
       const logoUrl = await fetchCompanyLogo(profile.company);
-      if (logoUrl) {
-        setProfile((prev) => ({ ...prev, companyLogo: logoUrl }));
-      }
+      if (logoUrl) setProfile((prev) => ({ ...prev, companyLogo: logoUrl }));
       setLogoFetching(false);
     };
-
     const debounceTimer = setTimeout(fetchLogo, 800);
     return () => clearTimeout(debounceTimer);
   }, [profile.company]);
@@ -356,9 +343,7 @@ function BuilderApp() {
   const handleAddNestedIcon = (socialIndex, iconData) => {
     setProfile((prev) => {
       const socials = [...prev.socials];
-      if (!socials[socialIndex].nestedIcons) {
-        socials[socialIndex].nestedIcons = [];
-      }
+      if (!socials[socialIndex].nestedIcons) socials[socialIndex].nestedIcons = [];
       if (socials[socialIndex].nestedIcons.length < 3) {
         socials[socialIndex].nestedIcons.push({
           id: iconData.label.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now(),
@@ -403,7 +388,6 @@ function BuilderApp() {
   };
 
   const statusLabel = profile.status?.label || "Available for work";
-  const matchedPreset = STATUS_PRESETS.find((p) => p.label === statusLabel);
   const isCustomStatus = profile.status?.type === "custom";
 
   const setStatusPreset = (preset) =>
@@ -474,13 +458,8 @@ function BuilderApp() {
     setDownloading(false);
   };
 
-  const handleFlipChange = (flipped) => {
-    setIsFlipped(flipped);
-  };
-
-  const handleFlipBack = () => {
-    setIsFlipped(false);
-  };
+  const handleFlipChange = (flipped) => setIsFlipped(flipped);
+  const handleFlipBack = () => setIsFlipped(false);
 
   const getQRCodeUrl = () => {
     const url = publishedUrl || window.location.href;
@@ -488,6 +467,99 @@ function BuilderApp() {
   };
 
   const atLimit = profile.socials.length >= MAX_SOCIALS;
+
+  // Preview panel JSX extracted so we can reuse in both desktop and mobile toggle
+  const PreviewPanel = () => (
+    <div className="preview-pane">
+      <div className="preview-label">Live Preview</div>
+      <div className="preview-wrapper">
+        <div className="preview-glow" />
+        <div id="ecard-preview" className={`ecard ecard-${sizeKey}`}
+          style={{
+            width: `${size.width}px`,
+            minHeight: `${size.height}px`,
+            background: selectedPalette.background,
+            color: selectedPalette.text,
+            "--card-bg": selectedPalette.background,
+            "--card-text": selectedPalette.text,
+            position: "relative",
+            overflow: "hidden"
+          }}>
+
+          {!isFlipped && (
+            <>
+              {profile.showImage && size.photoHeight > 0 && (
+                <div style={{
+                  height: size.photoHeight, width: "100%", overflow: "hidden",
+                  flexShrink: 0, borderRadius: "12px 12px 0 0",
+                  backgroundImage: `url(${profile.photo})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: `${(profile.focalPoint || { x: 50, y: 30 }).x}% ${(profile.focalPoint || { x: 50, y: 30 }).y}%`,
+                  backgroundRepeat: "no-repeat",
+                }} />
+              )}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "14px 16px 14px" }}>
+                <ProfileInfo profile={profile} size={size} />
+                <Contact
+                  profile={profile}
+                  onShare={() => handleCopy(window.location.href)}
+                  cardUrl={publishedUrl || window.location.href}
+                  onFlipChange={handleFlipChange}
+                />
+              </div>
+            </>
+          )}
+
+          {isFlipped && (
+            <div onClick={handleFlipBack}
+              style={{
+                position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                display: "flex", flexDirection: "column", alignItems: "center",
+                justifyContent: "center", padding: "2rem 1.5rem",
+                cursor: "pointer", animation: "flipIn 0.5s ease-out",
+                background: selectedPalette.background, color: selectedPalette.text,
+                zIndex: 100, borderRadius: "12px",
+              }}
+              className="card-back">
+              <div style={{ position: "absolute", top: "1.5rem", left: 0, right: 0, textAlign: "center" }}>
+                <h3 style={{ fontSize: "1.25rem", fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontWeight: 400, margin: 0, color: "inherit" }}>{profile.name}</h3>
+                <p style={{ fontSize: "0.85rem", margin: "0.25rem 0 0 0", color: "inherit", opacity: 0.6 }}>
+                  {profile.title}
+                </p>
+              </div>
+              <div style={{ background: "white", padding: "1rem", borderRadius: "5px",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
+                {publishedUrl ? (
+                  <>
+                    <img src={getQRCodeUrl()} alt="QR Code"
+                      style={{ width: "100px", height: "100px", display: "block" }} />
+                    <p style={{ fontSize: "0.7rem", color: "#6b7280", margin: 0, textAlign: "center" }}>
+                      Scan to view card
+                    </p>
+                  </>
+                ) : (
+                  <div style={{ width: "180px", height: "180px", display: "flex",
+                    alignItems: "center", justifyContent: "center",
+                    background: "#f3f4f6", borderRadius: "8px", color: "#6b7280",
+                    fontSize: "0.85rem", textAlign: "center", padding: "1rem" }}>
+                    Publish card to generate QR code
+                  </div>
+                )}
+              </div>
+              <div style={{ position: "absolute", bottom: "1.5rem", left: "2rem", right: "2rem",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
+                <div style={{ flex: 1, height: "1px", background: "currentColor", opacity: 0.2 }} />
+                <span style={{ fontSize: "0.7rem", opacity: 0.4, whiteSpace: "nowrap" }}>Tap to return</span>
+                <div style={{ flex: 1, height: "1px", background: "currentColor", opacity: 0.2 }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -501,8 +573,8 @@ function BuilderApp() {
         <IconPickerModal onAdd={handleAddSocial} onClose={() => setShowIconPicker(false)} isNested={false} />
       )}
       {showNestedIconPicker !== null && (
-        <IconPickerModal 
-          onAdd={(iconData) => handleAddNestedIcon(showNestedIconPicker, iconData)} 
+        <IconPickerModal
+          onAdd={(iconData) => handleAddNestedIcon(showNestedIconPicker, iconData)}
           onClose={() => setShowNestedIconPicker(null)}
           isNested={true}
         />
@@ -519,7 +591,26 @@ function BuilderApp() {
                 <h4>We know you're <i>buzzy</i> - <br />share what matters!</h4>
                 <p>Customize - Create - Connect</p>
               </div>
-              <UserProfile />
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
+                <UserProfile />
+                {/* FIX: Mobile preview toggle button — only visible on small screens via CSS */}
+                {isAuthenticated && (
+                  <button
+                    className="mobile-preview-toggle"
+                    onClick={() => setShowMobilePreview((v) => !v)}
+                    style={{
+                      display: "none", /* shown via media query below */
+                      alignItems: "center", gap: "6px",
+                      padding: "8px 14px", minHeight: "36px",
+                      background: "var(--accent-dim)", border: "1px solid var(--accent)",
+                      borderRadius: "999px", color: "var(--accent)",
+                      fontSize: "0.75rem", fontWeight: 600, cursor: "pointer"
+                    }}>
+                    <i className={showMobilePreview ? "fa-solid fa-eye-slash" : "fa-solid fa-eye"} />
+                    {showMobilePreview ? "Hide preview" : "Preview card"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -531,20 +622,68 @@ function BuilderApp() {
                 <div className="form-section">
                   <h3>Identity</h3>
 
-                  {["name","title","location","cvUrl"].map((field) => (
-                    <div className="form-field" key={field}>
-                      <label>
-                        {field === "cvUrl" ? "CV / Résumé URL" 
-                          : field.charAt(0).toUpperCase() + field.slice(1)}
-                      </label>
-                      <input type="text" value={profile[field] || ""}
-                        placeholder={field === "cvUrl" ? "https://..." : ""}
-                        onChange={(e) => handleChange(field, e.target.value)}
-                      />
-                    </div>
-                  ))}
+                  {/* FIX: name — proper autocomplete + capitalization */}
+                  <div className="form-field">
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={profile.name || ""}
+                      placeholder="Your full name"
+                      autoComplete="name"
+                      autoCorrect="off"
+                      autoCapitalize="words"
+                      inputMode="text"
+                      onChange={(e) => handleChange("name", e.target.value)}
+                    />
+                  </div>
 
-                  {/* Company with AUTO-FETCH */}
+                  {/* FIX: title — no autocorrect, it will butcher job titles */}
+                  <div className="form-field">
+                    <label>Title</label>
+                    <input
+                      type="text"
+                      value={profile.title || ""}
+                      placeholder="e.g. Product Designer"
+                      autoComplete="organization-title"
+                      autoCorrect="off"
+                      autoCapitalize="words"
+                      inputMode="text"
+                      onChange={(e) => handleChange("title", e.target.value)}
+                    />
+                  </div>
+
+                  {/* FIX: location — allow autocorrect, capitalize each word */}
+                  <div className="form-field">
+                    <label>Location</label>
+                    <input
+                      type="text"
+                      value={profile.location || ""}
+                      placeholder="e.g. London, UK"
+                      autoComplete="address-level2"
+                      autoCorrect="on"
+                      autoCapitalize="words"
+                      inputMode="text"
+                      onChange={(e) => handleChange("location", e.target.value)}
+                    />
+                  </div>
+
+                  {/* FIX: CV URL — url inputMode, no autocorrect */}
+                  <div className="form-field">
+                    <label>CV / Résumé URL</label>
+                    <input
+                      type="url"
+                      value={profile.cvUrl || ""}
+                      placeholder="https://..."
+                      autoComplete="url"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      inputMode="url"
+                      spellCheck="false"
+                      onChange={(e) => handleChange("cvUrl", e.target.value)}
+                    />
+                  </div>
+
+                  {/* FIX: company — no autocorrect, it will mangle brand names */}
                   <div className="form-field">
                     <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                       Company / Institute
@@ -552,8 +691,14 @@ function BuilderApp() {
                         <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "0.7rem", color: "var(--accent)" }} />
                       )}
                     </label>
-                    <input type="text" value={profile.company || ""}
+                    <input
+                      type="text"
+                      value={profile.company || ""}
                       placeholder="e.g. Google, Microsoft, Apple..."
+                      autoComplete="organization"
+                      autoCorrect="off"
+                      autoCapitalize="words"
+                      inputMode="text"
                       onChange={(e) => handleChange("company", e.target.value)}
                     />
                     <p style={{ fontSize: "0.7rem", color: "var(--text-3)", marginTop: "0.25rem" }}>
@@ -561,36 +706,30 @@ function BuilderApp() {
                     </p>
                   </div>
 
-                  {/* Manual Logo Upload Override */}
                   {profile.company && (
                     <div style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
                       <label className={`upload-label ${logoUploading ? "disabled" : ""}`}
                         style={{ padding: "6px 10px", fontSize: "0.75rem" }}>
                         {logoUploading ? (
-                          <>
-                            <i className="fa-solid fa-spinner fa-spin" />
-                            Processing...
-                          </>
+                          <><i className="fa-solid fa-spinner fa-spin" />Processing...</>
                         ) : (
-                          <>
-                            <i className="fa-solid fa-building" />
-                            {profile.companyLogo ? "Replace logo" : "Upload custom logo"}
-                          </>
+                          <><i className="fa-solid fa-building" />{profile.companyLogo ? "Replace logo" : "Upload custom logo"}</>
                         )}
                         <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={logoUploading} />
                       </label>
                       {profile.companyLogo && (
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", 
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem",
                           padding: "0.5rem", background: "var(--surface-2)", borderRadius: "6px" }}>
-                          <img src={profile.companyLogo} alt="Company logo" 
-                            style={{ width: "24px", height: "24px", objectFit: "cover", borderRadius: "50%", 
+                          <img src={profile.companyLogo} alt="Company logo"
+                            style={{ width: "24px", height: "24px", objectFit: "cover", borderRadius: "50%",
                               border: "1px solid var(--border)" }} />
                           <span style={{ fontSize: "0.75rem", color: "var(--text-2)" }}>Logo preview (circular)</span>
                           <button type="button"
                             onClick={() => handleChange("companyLogo", "")}
                             style={{ marginLeft: "auto", padding: "0.25rem 0.5rem", background: "transparent",
                               border: "1px solid var(--border)", borderRadius: "4px",
-                              color: "var(--text-3)", cursor: "pointer", fontSize: "0.7rem" }}>
+                              color: "var(--text-3)", cursor: "pointer", fontSize: "0.7rem",
+                              minHeight: "36px" }}>
                             Remove
                           </button>
                         </div>
@@ -598,11 +737,21 @@ function BuilderApp() {
                     </div>
                   )}
 
+                  {/* FIX: email — email inputMode, no autocorrect, no autocapitalize */}
                   <div className="form-field">
                     <label>Email</label>
                     <div style={{ display: "flex", gap: "0.5rem" }}>
-                      <input type="email" value={profile.email || ""} placeholder="your@email.com"
-                        onChange={(e) => handleChange("email", e.target.value)} style={{ flex: 1 }}
+                      <input
+                        type="email"
+                        value={profile.email || ""}
+                        placeholder="your@email.com"
+                        autoComplete="email"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        inputMode="email"
+                        spellCheck="false"
+                        onChange={(e) => handleChange("email", e.target.value)}
+                        style={{ flex: 1 }}
                       />
                       <select value={profile.emailType || "work"}
                         onChange={(e) => handleChange("emailType", e.target.value)} style={{ width: "auto" }}>
@@ -612,9 +761,17 @@ function BuilderApp() {
                     </div>
                   </div>
 
+                  {/* FIX: phone — tel inputMode, numeric keyboard on mobile */}
                   <div className="form-field">
                     <label>Phone (Optional)</label>
-                    <input type="tel" value={profile.phone || ""} placeholder="+1 234 567 8900"
+                    <input
+                      type="tel"
+                      value={profile.phone || ""}
+                      placeholder="+1 234 567 8900"
+                      autoComplete="tel"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      inputMode="tel"
                       onChange={(e) => handleChange("phone", e.target.value)}
                     />
                   </div>
@@ -637,21 +794,26 @@ function BuilderApp() {
                             setProfile((prev) => ({ ...prev, status: { label: "", type: "custom" } }));
                           }
                         }}>
-                        <i className="fa-solid fa-pen" style={{ fontSize:"0.62rem" }} />
+                        <i className="fa-solid fa-pen" style={{ fontSize: "0.62rem" }} />
                         Custom
                       </button>
                     </div>
                     {isCustomStatus && (
                       <div style={{ marginTop: 6, position: "relative" }}>
-                        <input type="text" placeholder="e.g. Freelancing, On sabbatical…"
+                        {/* FIX: custom status — off for autocorrect, it mangled custom phrases */}
+                        <input
+                          type="text"
+                          placeholder="e.g. Freelancing, On sabbatical…"
                           value={statusLabel || ""}
+                          autoCorrect="off"
+                          autoCapitalize="sentences"
+                          inputMode="text"
                           onChange={(e) => {
                             const text = e.target.value;
-                            if (text.length <= 28) {
-                              setStatusCustom(text);
-                            }
+                            if (text.length <= 28) setStatusCustom(text);
                           }}
-                          maxLength={28} autoFocus
+                          maxLength={28}
+                          autoFocus
                         />
                         <span style={{
                           position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
@@ -668,15 +830,9 @@ function BuilderApp() {
                   <div className="photo-upload-row">
                     <label className={`upload-label ${imageUploading ? "disabled" : ""}`}>
                       {imageUploading ? (
-                        <>
-                          <i className="fa-solid fa-spinner fa-spin" />
-                          Processing image...
-                        </>
+                        <><i className="fa-solid fa-spinner fa-spin" />Processing image...</>
                       ) : (
-                        <>
-                          <i className="fa-solid fa-image" />
-                          {profile.photo ? "Change photo" : "Upload photo"}
-                        </>
+                        <><i className="fa-solid fa-image" />{profile.photo ? "Change photo" : "Upload photo"}</>
                       )}
                       <input type="file" accept="image/*" onChange={handlePhotoUpload} disabled={imageUploading} />
                     </label>
@@ -722,15 +878,21 @@ function BuilderApp() {
                     <div className="custom-size-row">
                       <div className="form-field">
                         <label>Width (px)</label>
-                        <input type="number" min={200} max={800}
+                        <input
+                          type="number"
+                          min={200} max={800}
                           value={profile.customWidth || 350}
+                          inputMode="numeric"
                           onChange={(e) => handleChange("customWidth", Number(e.target.value))}
                         />
                       </div>
                       <div className="form-field">
                         <label>Height (px)</label>
-                        <input type="number" min={200} max={900}
+                        <input
+                          type="number"
+                          min={200} max={900}
                           value={profile.customHeight || 370}
+                          inputMode="numeric"
                           onChange={(e) => handleChange("customHeight", Number(e.target.value))}
                         />
                       </div>
@@ -775,13 +937,20 @@ function BuilderApp() {
                   {profile.socials.map((social, index) => {
                     const hasNested = profile.socials.filter(s => s.isNested).length > 0;
                     const canEnableNested = !hasNested || social.isNested;
-                    
+
                     return (
                       <div key={social.id} className="social-edit-row">
                         <div className="social-row-top">
                           <i className={social.iconClass}
-                            style={{ color:"var(--accent)", width:18, textAlign:"center", flexShrink:0 }} />
-                          <input type="text" value={social.href || ""}
+                            style={{ color: "var(--accent)", width: 18, textAlign: "center", flexShrink: 0 }} />
+                          {/* FIX: social URL inputs — url keyboard, no autocorrect */}
+                          <input
+                            type="url"
+                            value={social.href || ""}
+                            autoCorrect="off"
+                            autoCapitalize="none"
+                            inputMode="url"
+                            spellCheck="false"
                             onChange={(e) => {
                               setProfile((prev) => {
                                 const s = [...prev.socials];
@@ -796,20 +965,21 @@ function BuilderApp() {
                             <i className="fa-solid fa-xmark" />
                           </button>
                         </div>
-                        
+
                         <div style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "1px solid var(--border)",
                           display: "flex", alignItems: "center", gap: "0.5rem" }}>
                           <label style={{ fontSize: "0.75rem", color: "var(--text-2)",
                             display: "flex", alignItems: "center", gap: "0.5rem",
                             cursor: canEnableNested ? "pointer" : "not-allowed",
-                            opacity: canEnableNested ? 1 : 0.5 }}>
+                            opacity: canEnableNested ? 1 : 0.5,
+                            minHeight: "44px" }}>
                             <input type="checkbox" checked={social.isNested || false}
                               disabled={!canEnableNested}
                               onChange={(e) => {
                                 setProfile((prev) => {
                                   const s = [...prev.socials];
-                                  s[index] = { 
-                                    ...s[index], 
+                                  s[index] = {
+                                    ...s[index],
                                     isNested: e.target.checked,
                                     nestedIcons: e.target.checked ? (s[index].nestedIcons || []) : []
                                   };
@@ -830,12 +1000,19 @@ function BuilderApp() {
                             <div style={{ fontSize: "0.75rem", color: "var(--text-2)", marginBottom: "0.5rem" }}>
                               Sub-icons ({social.nestedIcons?.length || 0}/3)
                             </div>
-                            
+
                             {social.nestedIcons?.map((nested, nestedIdx) => (
                               <div key={nested.id} style={{ display: "flex", alignItems: "center",
                                 gap: "0.5rem", marginBottom: "0.25rem" }}>
                                 <i className={nested.iconClass} style={{ fontSize: "0.875rem", width: 16 }} />
-                                <input type="text" value={nested.href}
+                                {/* FIX: nested URL inputs */}
+                                <input
+                                  type="url"
+                                  value={nested.href}
+                                  autoCorrect="off"
+                                  autoCapitalize="none"
+                                  inputMode="url"
+                                  spellCheck="false"
                                   onChange={(e) => {
                                     setProfile((prev) => {
                                       const s = [...prev.socials];
@@ -846,7 +1023,7 @@ function BuilderApp() {
                                     });
                                   }}
                                   placeholder="https://..."
-                                  style={{ flex: 1, fontSize: "0.8rem", padding: "0.25rem 0.5rem" }}
+                                  style={{ flex: 1, padding: "0.25rem 0.5rem" }}
                                 />
                                 <button type="button"
                                   onClick={() => {
@@ -858,19 +1035,21 @@ function BuilderApp() {
                                   }}
                                   style={{ padding: "0.25rem 0.5rem", background: "transparent",
                                     border: "1px solid var(--border)", borderRadius: "4px",
-                                    color: "var(--text-3)", cursor: "pointer", fontSize: "0.7rem" }}>
+                                    color: "var(--text-3)", cursor: "pointer", fontSize: "0.7rem",
+                                    minWidth: "44px", minHeight: "44px" }}>
                                   ✕
                                 </button>
                               </div>
                             ))}
-                            
+
                             {(!social.nestedIcons || social.nestedIcons.length < 3) && (
                               <button type="button"
                                 onClick={() => setShowNestedIconPicker(index)}
                                 style={{ width: "100%", padding: "0.4rem",
                                   background: "var(--surface)", border: "1px dashed var(--border)",
                                   borderRadius: "4px", color: "var(--text-2)",
-                                  cursor: "pointer", fontSize: "0.75rem", marginTop: "0.25rem" }}>
+                                  cursor: "pointer", fontSize: "0.75rem", marginTop: "0.25rem",
+                                  minHeight: "44px" }}>
                                 + Add sub-icon
                               </button>
                             )}
@@ -924,10 +1103,16 @@ function BuilderApp() {
                         </p>
                       </div>
                       <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                        <input type="text" readOnly value={publishedUrl}
-                          style={{ flex: 1, padding: "0.5rem", fontSize: "0.8rem",
-                            border: "1px solid #86efac", borderRadius: "4px",
-                            background: "white", color: "#166534", fontFamily: "monospace" }}
+                        <input
+                          type="text"
+                          readOnly
+                          value={publishedUrl}
+                          autoCorrect="off"
+                          autoCapitalize="none"
+                          spellCheck="false"
+                          style={{ flex: 1, padding: "0.5rem", border: "1px solid #86efac",
+                            borderRadius: "4px", background: "white", color: "#166534",
+                            fontFamily: "monospace" }}
                           onClick={(e) => e.target.select()}
                         />
                         <button
@@ -941,7 +1126,8 @@ function BuilderApp() {
                           }}
                           style={{ padding: "0.5rem 0.75rem", background: "#22c55e",
                             color: "white", border: "none", borderRadius: "4px",
-                            cursor: "pointer", fontSize: "0.875rem", fontWeight: 600 }}>
+                            cursor: "pointer", fontSize: "0.875rem", fontWeight: 600,
+                            minHeight: "44px" }}>
                           Copy
                         </button>
                       </div>
@@ -993,196 +1179,19 @@ function BuilderApp() {
           </div>
         </div>
 
-        {isAuthenticated && (
-          <div className="preview-pane">
-            <div className="preview-label">Live Preview</div>
-            <div className="preview-wrapper">
-              <div className="preview-glow" />
-              <div id="ecard-preview" className={`ecard ecard-${sizeKey}`}
-                style={{ 
-                  width: `${size.width}px`, 
-                  minHeight: `${size.height}px`,
-                  background: selectedPalette.background, 
-                  color: selectedPalette.text,
-                  "--card-bg": selectedPalette.background, 
-                  "--card-text": selectedPalette.text,
-                  position: "relative",
-                  overflow: "hidden"
-                }}>
-                
-                {/* FRONT SIDE - Only when NOT flipped */}
-                {!isFlipped && (
-                  <>
-                    {profile.showImage && size.photoHeight > 0 && (
-                      <div style={{
-                        height: size.photoHeight,
-                        width: "100%",
-                        overflow: "hidden",
-                        flexShrink: 0,
-                        borderRadius: "12px 12px 0 0",
-                        backgroundImage: `url(${profile.photo})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: `${(profile.focalPoint || { x: 50, y: 30 }).x}% ${(profile.focalPoint || { x: 50, y: 30 }).y}%`,
-                        backgroundRepeat: "no-repeat",
-                      }} />
-                    )}
-
-                    <div style={{ 
-                      flex: 1, 
-                      display: "flex", 
-                      flexDirection: "column", 
-                      padding: "14px 16px 14px" 
-                    }}>
-                      <ProfileInfo profile={profile} size={size} />
-                      <Contact 
-                        profile={profile} 
-                        onShare={() => handleCopy(window.location.href)}
-                        cardUrl={publishedUrl || window.location.href}
-                        onFlipChange={handleFlipChange}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* BACK SIDE - QR Code - Only when flipped */}
-                {isFlipped && (
-                  <div 
-                    onClick={handleFlipBack}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "2rem 1.5rem",
-                      cursor: "pointer",
-                      animation: "flipIn 0.5s ease-out",
-                      background: selectedPalette.background,
-                      color: selectedPalette.text,
-                      zIndex: 100,
-                      borderRadius: "12px",
-                    }}
-                    className="card-back"
-                  >
-                    {/* Name at top */}
-                    <div style={{
-                      position: "absolute",
-                      top: "1.5rem",
-                      left: 0,
-                      right: 0,
-                      textAlign: "center",
-                    }}>
-                      <h3 style={{
-                        fontSize: "1.25rem",
-                        fontFamily: "'DM Serif Display', Georgia, serif",
-                        fontWeight: 400,
-                        margin: 0,
-                        color: "inherit",
-                      }}>
-                        {profile.name}
-                      </h3>
-                      <p style={{
-                        fontSize: "0.85rem",
-                        margin: "0.25rem 0 0 0",
-                        color: "inherit",
-                        opacity: 0.6,
-                      }}>
-                        {profile.title}
-                      </p>
-                    </div>
-
-                    {/* QR Code in center */}
-                    <div style={{
-                      background: "white",
-                      padding: "1rem",
-                      borderRadius: "5px",
-                      boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "0.75rem",
-                    }}>
-                      {publishedUrl ? (
-                        <>
-                          <img 
-                            src={getQRCodeUrl()} 
-                            alt="QR Code"
-                            style={{
-                              width: "100px",
-                              height: "100px",
-                              display: "block",
-                            }}
-                          />
-                          <p style={{
-                            fontSize: "0.7rem",
-                            color: "#6b7280",
-                            margin: 0,
-                            textAlign: "center",
-                          }}>
-                            Scan to view card
-                          </p>
-                        </>
-                      ) : (
-                        <div style={{
-                          width: "180px",
-                          height: "180px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: "#f3f4f6",
-                          borderRadius: "8px",
-                          color: "#6b7280",
-                          fontSize: "0.85rem",
-                          textAlign: "center",
-                          padding: "1rem",
-                        }}>
-                          Publish card to generate QR code
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Line at bottom */}
-                    <div style={{
-                      position: "absolute",
-                      bottom: "1.5rem",
-                      left: "2rem",
-                      right: "2rem",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "0.5rem",
-                    }}>
-                      <div style={{
-                        flex: 1,
-                        height: "1px",
-                        background: "currentColor",
-                        opacity: 0.2,
-                      }} />
-                      <span style={{
-                        fontSize: "0.7rem",
-                        opacity: 0.4,
-                        whiteSpace: "nowrap",
-                      }}>
-                        Tap to return
-                      </span>
-                      <div style={{
-                        flex: 1,
-                        height: "1px",
-                        background: "currentColor",
-                        opacity: 0.2,
-                      }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Desktop preview — always visible on large screens */}
+        {isAuthenticated && <PreviewPanel />}
       </div>
+
+      {/* FIX: Inline style for mobile-only elements.
+          Doing this here avoids needing a separate CSS class for a one-liner show/hide. */}
+      <style>{`
+        @media (max-width: 768px) {
+          .mobile-preview-toggle {
+            display: flex !important;
+          }
+        }
+      `}</style>
     </>
   );
 }

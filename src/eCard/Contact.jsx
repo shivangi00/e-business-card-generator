@@ -201,7 +201,7 @@ function Contact({ profile, onShare, cardUrl, onFlipChange }) {
           e.currentTarget.style.transform = "scale(1)";
         }}
       >
-        <i className="fa-solid fa-share" style={{ fontSize: "1rem" }} />
+        <i className="fa-solid fa-share-nodes" style={{ fontSize: "1rem" }} />
       </button>
     </div>
   );
