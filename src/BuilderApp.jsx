@@ -1183,12 +1183,94 @@ function BuilderApp() {
         {isAuthenticated && <PreviewPanel />}
       </div>
 
-      {/* FIX: Inline style for mobile-only elements.
-          Doing this here avoids needing a separate CSS class for a one-liner show/hide. */}
+      {/* Mobile preview overlay — slides in from bottom when toggle is tapped */}
+      {isAuthenticated && showMobilePreview && (
+        <div
+          onClick={() => setShowMobilePreview(false)}
+          style={{
+            position: "fixed", inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(4px)",
+            zIndex: 500,
+            display: "none", // shown via media query below
+          }}
+          className="mobile-preview-overlay"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              bottom: 0, left: 0, right: 0,
+              background: "var(--bg)",
+              borderRadius: "24px 24px 0 0",
+              padding: "0 0 40px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              maxHeight: "90dvh",
+              overflowY: "auto",
+            }}
+          >
+            {/* Drag handle */}
+            <div style={{
+              width: 40, height: 4, borderRadius: 999,
+              background: "var(--border-hover)",
+              margin: "14px auto 0",
+              flexShrink: 0,
+            }} />
+
+            {/* Close button */}
+            <div style={{
+              width: "100%", display: "flex",
+              justifyContent: "space-between", alignItems: "center",
+              padding: "12px 20px 0",
+              flexShrink: 0,
+            }}>
+              <span style={{ fontSize: "0.65rem", letterSpacing: "0.15em",
+                textTransform: "uppercase", color: "var(--text-3)", fontWeight: 600 }}>
+                Live Preview
+              </span>
+              <button
+                onClick={() => setShowMobilePreview(false)}
+                style={{
+                  background: "var(--surface-2)", border: "1px solid var(--border)",
+                  borderRadius: "999px", color: "var(--text-2)",
+                  padding: "6px 14px", fontSize: "0.75rem", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "6px",
+                  minHeight: "36px",
+                }}>
+                <i className="fa-solid fa-xmark" /> Close
+              </button>
+            </div>
+
+            {/* The card preview — scaled to fit nicely */}
+            <div style={{
+              padding: "24px 20px",
+              display: "flex", justifyContent: "center",
+              width: "100%",
+            }}>
+              <div style={{
+                transform: `scale(${Math.min(1, (window.innerWidth - 40) / size.width)})`,
+                transformOrigin: "top center",
+              }}>
+                <PreviewPanel />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @media (max-width: 768px) {
           .mobile-preview-toggle {
             display: flex !important;
+          }
+          .mobile-preview-overlay {
+            display: block !important;
+          }
+          /* Hide the static preview pane on mobile — overlay replaces it */
+          .app-root > .preview-pane {
+            display: none !important;
           }
         }
       `}</style>
